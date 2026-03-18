@@ -548,17 +548,15 @@ class Normalizer:
                 index += 1
                 continue
 
-            if self._compiled['phone'].search(word_lower):
-                s = f'index: {index}, word: {word}, condition phone'
-                logger.debug(s)
-                if normalize_telephone:
-                    splitted = word.split('-')
-                    if len(splitted) == 2:
-                        left = put_spacing_num(splitted[0], english=normalize_in_english)
-                        right = put_spacing_num(splitted[1], english=normalize_in_english)
-                        word = f'{left}, {right}'
-                result.append(word)
-                index += 1
+            if self._compiled['phone'].search(word_lower):  
+                if normalize_telephone:  
+                    splitted = word.split('-')  
+                    if len(splitted) == 2:  
+                        left = put_spacing_num(splitted[0], english=normalize_in_english)  
+                        right = put_spacing_num(splitted[1], english=normalize_in_english)  
+                        word = f'{left}, {right}' 
+                result.append(word)  
+                index += 1  
                 continue
 
             if self._compiled['user'].search(word_lower):
@@ -859,43 +857,52 @@ class Normalizer:
                     index += 4
                     continue
 
-            if (
-                word_lower in ['tahun', 'thun']
-                and index < (len(tokenized) - 1)
-                and normalize_year
-            ):
-                s = f'index: {index}, word: {word}, condition tahun'
-                logger.debug(s)
-                if (
-                    _is_number_regex(tokenized[index + 1])
-                    and len(tokenized[index + 1]) == 4
-                ):
-                    t = tokenized[index + 1]
-                    if t[1] != '0':
-                        l = to_cardinal(int(t[:2]), english=normalize_in_english)
-                        r = to_cardinal(int(t[2:]), english=normalize_in_english)
-                        c = f'{l} {r}'
-                    else:
-                        c = to_cardinal(int(t), english=normalize_in_english)
-                    if (
-                        index < (len(tokenized) - 3)
-                        and tokenized[index + 2] == '-'
-                        and tokenized[index + 3].lower() == 'an'
-                    ):
-                        if normalize_in_english:
-                            end = 's'
-                        else:
-                            end = 'an'
-                        plus = 4
-                    else:
-                        end = ''
-                        plus = 2
-                    if normalize_in_english:
-                        start = ''
-                    else:
-                        start = 'tahun '
-                    result.append(f'{start}{c}{end}')
-                    index += plus
+            if (  
+                word_lower in ['tahun', 'thun']  
+                and index < (len(tokenized) - 1)  
+                and normalize_year  
+            ):  
+                s = f'index: {index}, word: {word}, condition tahun'  
+                logger.debug(s)  
+                if (  
+                    _is_number_regex(tokenized[index + 1])  
+                    and len(tokenized[index + 1]) == 4  
+                ):  
+                    t = tokenized[index + 1]  
+                    # Modified logic for year pronunciation  
+                    if t[1] != '0':  
+                        # Years like 1987, 2023: split pronunciation  
+                        l = to_cardinal(int(t[:2]), english=normalize_in_english)  
+                        r = to_cardinal(int(t[2:]), english=normalize_in_english)  
+                        c = f'{l} {r}'  
+                    elif t[:2] == '20' and t[2:] != '00':  
+                        # Years 2010-2099 (except 2000): split pronunciation  
+                        l = to_cardinal(int(t[:2]), english=normalize_in_english)  
+                        r = to_cardinal(int(t[2:]), english=normalize_in_english)  
+                        c = f'{l} {r}'  
+                    else:  
+                        # Years 2000-2009 and 2000: full cardinal  
+                        c = to_cardinal(int(t), english=normalize_in_english)  
+                    
+                    if (  
+                        index < (len(tokenized) - 3)  
+                        and tokenized[index + 2] == '-'  
+                        and tokenized[index + 3].lower() == 'an'  
+                    ):  
+                        if normalize_in_english:  
+                            end = 's'  
+                        else:  
+                            end = 'an'  
+                        plus = 4  
+                    else:  
+                        end = ''  
+                        plus = 2  
+                    if normalize_in_english:  
+                        start = ''  
+                    else:  
+                        start = 'tahun '  
+                    result.append(f'{start}{c}{end}')  
+                    index += plus  
                     continue
 
             if normalize_fraction and _is_number_regex(word) and index < (len(tokenized) - 2):
@@ -1080,20 +1087,20 @@ class Normalizer:
                         if normalize_time:
                             hour = parsed.strftime('%I')
                             hour = hour.lstrip('0')
-                            if parsed.hour < 12:
-                                if normalize_in_english:
-                                    period = 'morning'
-                                else:
-                                    period = 'pagi'
-                            elif parsed.hour < 19:
-                                if normalize_in_english:
-                                    period = 'evening'
-                                else:
-                                    period = 'petang'
-                            else:
-                                if normalize_in_english:
-                                    period = 'night'
-                                else:
+                            if parsed.hour < 12:  
+                                if normalize_in_english:  
+                                    period = 'am'  # Changed from 'morning'  
+                                else:  
+                                    period = 'pagi'  
+                            elif parsed.hour < 19:  
+                                if normalize_in_english:  
+                                    period = 'pm'  # Changed from 'evening'  
+                                else:  
+                                    period = 'petang'  
+                            else:  
+                                if normalize_in_english:  
+                                    period = 'pm'  # Changed from 'night'  
+                                else:  
                                     period = 'malam'
                             hour = cardinal(hour, english=normalize_in_english)
                             if int(minute) > 0:
@@ -1157,6 +1164,17 @@ class Normalizer:
                 result.append(word)
                 index += 1
                 continue
+
+            if normalize_date and _is_number_regex(word) and index < (len(tokenized) - 1):  
+                next_word = tokenized[index + 1].lower()  
+                if next_word in ['january', 'february', 'march', 'april', 'may', 'june',   
+                     'july', 'august', 'september', 'october', 'november', 'december']:  
+                    # Convert to ordinal instead of cardinal  
+                    result.append(to_ordinal(int(word), english=normalize_in_english))  
+                    index += 1  # Skip the month name  
+                    result.append(tokenized[index])  # Add the month name  
+                    index += 1  
+                    continue
 
             if normalize_cardinal:
                 cardinal_ = cardinal(word, english=normalize_in_english)

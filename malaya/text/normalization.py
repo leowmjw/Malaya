@@ -130,8 +130,8 @@ digits = '0123456789'
 sastrawi_stemmer = None
 
 time_descriptors = {
-    "am": "pagi", "a.m.": "pagi", "morning": "pagi", "pagi": "pagi", "pgi": "pagi",
-    "pm": "petang", "p.m.": "petang", "petang": "petang", "ptg": "petang",
+    "A.M.": "am", "AM": "am", "am": "am", "a.m.": "am", "am": "pagi", "a.m.": "pagi", "morning": "pagi", "pagi": "pagi", "pgi": "pagi",
+    "P.M.": "pm", "PM": "pm", "pm": "pm", "p.m.": "pm", "pm": "petang", "p.m.": "petang", "petang": "petang", "ptg": "petang",
     "tengahari": "tengahari", "tngahari": "tengahari",
     "malam": "malam",
     "hours": "", "hour": "", "hrs": "", "jam": ""
@@ -153,11 +153,12 @@ def to_cardinal(n, english=False):
     else:
         return num2word.to_cardinal(n)
 
-def to_ordinal(n, english=False):
-    if english:
-        s = num2words(n, to='ordinal').replace('-', ' ')
-        return re.sub(r'[ ]+', ' ', s).strip()
-    else:
+def to_ordinal(n, english=False):  
+    if english:  
+        s = num2words(n, to='ordinal')  
+        # Don't remove hyphens for proper ordinal formatting  
+        return re.sub(r'[ ]+', ' ', s).strip()  
+    else:  
         return num2word.to_ordinal(n)
 
 def initialize_sastrawi():
@@ -938,40 +939,57 @@ def parse_time_string(text):
         
     return matches
 
-def parse_date_string(
-    word, 
-    normalize_date=True, 
-    dateparser_settings={'TIMEZONE': 'GMT+8'},
-    english=False,
-):
-    if english:
-        month_map = bulan_en
-    else:
-        month_map = bulan
-    try:
-        has_year = bool(re.search(r'\b(19|20)\d{2}\b', word))
-        
-        parsed = dateparser.parse(word, settings=dateparser_settings)
-        if parsed:
-            if has_year:
-                word = parsed.strftime('%d/%m/%Y')
-                if normalize_date:
-                    day, month, year = word.split('/')
-                    day = cardinal(day, english=english)
-                    month = month_map[int(month)].title()
-                    year = cardinal(year, english=english)
-                    word = f'{day} {month} {year}'
-            else:
-                word = parsed.strftime('%d/%m')
-                if normalize_date:
-                    day, month = word.split('/')
-                    day = cardinal(day, english=english)
-                    month = month_map[int(month)].title()
-                    word = f'{day} {month}'
-
-    except Exception as e:
-        logger.warning(str(e))
+def parse_date_string(  
+    word,   
+    normalize_date=True,   
+    dateparser_settings={'TIMEZONE': 'GMT+8'},  
+    english=False,  
+):  
+    if english:  
+        month_map = bulan_en  
+    else:  
+        month_map = bulan  
+      
+    # Check if original input was month-day format (no year)  
+    is_month_day_only = bool(re.search(r'\b(?:[Jj]an(?:uari)?|[Ff]eb(?:ruari)?|[Mm]a(?:c)?|[Aa]pr(?:il)?|[Mm]ei|[Jj]u(?:n)?|[Jj]ula(?:i)?|[Aa]ug(?:ust)?|[Oo]gos|[Ss]ept?(?:ember)?|[Oo]kt(?:ober)?|[Nn]ov(?:ember)?|[Dd]is(?:ember)?)\s+[0123]?[0-9]\b$', word.strip()))  
+      
+    try:  
+        has_year = bool(re.search(r'\b(19|20)\d{2}\b', word))  
+          
+        parsed = dateparser.parse(word, settings=dateparser_settings)  
+        if parsed:  
+            if has_year:  
+                word = parsed.strftime('%d/%m/%Y')  
+                if normalize_date:  
+                    day, month, year = word.split('/')  
+                    day = cardinal(day, english=english)  
+                    month = month_map[int(month)].title()  
+                    year = cardinal(year, english=english)  
+                    word = f'{day} {month} {year}'  
+            elif is_month_day_only:  
+                # Handle month-day format: preserve month, convert day to words  
+                original_parts = word.strip().split()  
+                if len(original_parts) == 2:  
+                    month_name = original_parts[0].title()  
+                    day_num = original_parts[1]  
+                    try:  
+                        day_word = cardinal(day_num, english=english)  
+                        word = f'{month_name} {day_word}'  
+                    except:  
+                        # If day conversion fails, keep original  
+                        word = f'{month_name} {day_num}'  
+            else:  
+                word = parsed.strftime('%d/%m')  
+                if normalize_date:  
+                    day, month = word.split('/')  
+                    day = cardinal(day, english=english)  
+                    month = month_map[int(month)].title()  
+                    word = f'{day} {month}'  
+  
+    except Exception as e:  
+        logger.warning(str(e))  
     return word
+
 
 def fix_spacing(text):
     
